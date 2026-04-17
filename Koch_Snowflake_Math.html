@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koch Snowflake — Mathematical Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #03080f;
+  --panel:    #070e18;
+  --border:   #0d2235;
+  --cyan:     #00e5ff;
+  --cyan2:    #00b4cc;
+  --gold:     #ffc947;
+  --red:      #ff4d6d;
+  --text:     #c8dbe8;
+  --muted:    #4a6a80;
+  --mono:     'Space Mono', monospace;
+  --serif:    'DM Serif Display', serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Grid layout ── */
+.layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  gap: 0;
+}
+
+/* ── Header ── */
+header {
+  grid-column: 1 / -1;
+  padding: 20px 28px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+}
+header h1 {
+  font-family: var(--serif);
+  font-size: 26px; font-weight: 400;
+  color: var(--cyan);
+  letter-spacing: 0.01em;
+}
+header .sub {
+  font-size: 11px; color: var(--muted);
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+.dim-badge {
+  margin-left: auto;
+  background: rgba(0,229,255,0.08);
+  border: 1px solid var(--cyan2);
+  border-radius: 6px; padding: 4px 12px;
+  font-size: 12px; color: var(--cyan);
+  white-space: nowrap;
+}
+
+/* ── Sidebar ── */
+aside {
+  grid-row: 2;
+  border-right: 1px solid var(--border);
+  padding: 20px 20px 24px;
+  display: flex; flex-direction: column; gap: 18px;
+  overflow-y: auto;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px;
+}
+.card-title {
+  font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+.card-title::before {
+  content: ''; display: inline-block;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cyan);
+}
+
+/* Iteration slider */
+.iter-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.iter-label { font-size: 11px; color: var(--muted); }
+.iter-num {
+  font-size: 28px; color: var(--cyan); font-family: var(--serif);
+  line-height: 1;
+}
+input[type=range] {
+  width: 100%; height: 3px; cursor: pointer;
+  accent-color: var(--cyan);
+  border-radius: 2px;
+}
+.iter-marks {
+  display: flex; justify-content: space-between;
+  margin-top: 4px; padding: 0 1px;
+  font-size: 9px; color: var(--muted);
+}
+
+/* Stat rows */
+.stat { margin-bottom: 10px; }
+.stat:last-child { margin-bottom: 0; }
+.stat-label { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
+.stat-formula { font-size: 10px; color: #2a5570; margin-bottom: 4px; font-style: italic; }
+.stat-value {
+  font-size: 15px; font-weight: 700; font-family: var(--mono);
+  color: var(--cyan);
+}
+.stat-value.gold  { color: var(--gold); }
+.stat-value.red   { color: var(--red); }
+.stat-value.white { color: #e8f4ff; }
+
+/* Area ratio bar */
+.ratio-bar-wrap { margin-top: 8px; }
+.ratio-bar-track {
+  height: 6px; background: #0d2235; border-radius: 3px; overflow: hidden; position: relative;
+}
+.ratio-bar-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--cyan2), var(--cyan));
+  transition: width 0.35s ease;
+}
+.ratio-labels {
+  display: flex; justify-content: space-between;
+  font-size: 9px; color: var(--muted); margin-top: 3px;
+}
+
+/* Perimeter divergence warning */
+.diverge-note {
+  font-size: 10px; color: var(--red);
+  margin-top: 6px; padding: 6px 8px;
+  background: rgba(255,77,109,0.08);
+  border-left: 2px solid var(--red);
+  border-radius: 0 4px 4px 0;
+}
+
+/* Formula reference */
+.formula-block {
+  font-size: 10px; line-height: 1.9; color: #3a6a88;
+}
+.formula-block span { color: #5a9ab8; }
+.formula-block .eq  { color: var(--cyan2); font-weight: 700; }
+
+/* Color picker row */
+.color-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.color-label { font-size: 10px; color: var(--muted); flex: 1; }
+input[type=color] {
+  width: 36px; height: 28px; border: 1px solid var(--border);
+  border-radius: 6px; cursor: pointer; background: none;
+  padding: 2px;
+}
+.bg-row {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;
+}
+.bg-btn {
+  width: 22px; height: 22px; border-radius: 4px; cursor: pointer;
+  border: 1.5px solid transparent; transition: border-color 0.15s;
+}
+.bg-btn.active { border-color: var(--cyan); }
+
+/* ── Canvas area ── */
+main {
+  grid-row: 2; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+canvas {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+canvas.grabbing { cursor: grabbing; }
+
+/* zoom hint */
+.zoom-hint {
+  position: absolute; bottom: 14px; right: 18px;
+  font-size: 10px; color: var(--muted); letter-spacing: 0.08em;
+  pointer-events: none;
+}
+.zoom-reset {
+  position: absolute; bottom: 14px; left: 18px;
+  font-size: 10px; color: var(--muted);
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 10px; cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.zoom-reset:hover { color: var(--cyan); border-color: var(--cyan2); }
+
+/* Area convergence indicator */
+.converge-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 6px;
+}
+.converge-arrow { font-size: 16px; color: var(--gold); }
+.converge-text  { font-size: 10px; color: var(--muted); line-height: 1.4; }
+.converge-text strong { color: var(--gold); }
+
+/* responsive */
+@media (max-width: 700px) {
+  .layout { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
+  aside { grid-row: 2; border-right: none; border-bottom: 1px solid var(--border);
+          flex-direction: row; flex-wrap: wrap; max-height: 280px; overflow-y: auto; }
+  main  { grid-row: 3; min-height: 360px; }
+  .card { min-width: 200px; flex: 1; }
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <h1>Koch Snowflake</h1>
+      <div class="sub">Fractal geometry · Perimeter &amp; area analysis</div>
+    </div>
+    <div class="dim-badge">D = ln(4)/ln(3) ≈ 1.2618</div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside>
+
+    <!-- Iteration control -->
+    <div class="card">
+      <div class="card-title">Iteration (n)</div>
+      <div class="iter-row">
+        <span class="iter-label">Current step</span>
+        <span class="iter-num" id="iterNum">5</span>
+      </div>
+      <input type="range" id="iterSlider" min="0" max="7" value="5">
+      <div class="iter-marks">
+        <span>0</span><span>1</span><span>2</span><span>3</span>
+        <span>4</span><span>5</span><span>6</span><span>7</span>
+      </div>
+    </div>
+
+    <!-- Perimeter -->
+    <div class="card">
+      <div class="card-title">Perimeter analysis</div>
+      <div class="stat">
+        <div class="stat-label">Sides  Nₙ = 3·4ⁿ</div>
+        <div class="stat-value white" id="statSides">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Side length  Lₙ = s·(1/3)ⁿ</div>
+        <div class="stat-value white" id="statSideLen">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Perimeter  Pₙ = 3s·(4/3)ⁿ</div>
+        <div class="stat-value red" id="statPerim">—</div>
+      </div>
+      <div class="diverge-note" id="divergeNote">
+        ↑ Grows without bound as n→∞ (diverges)
+      </div>
+    </div>
+
+    <!-- Area -->
+    <div class="card">
+      <div class="card-title">Area analysis</div>
+      <div class="stat">
+        <div class="stat-label">Aₙ = A₀(1 + 3/5·(1−(4/9)ⁿ))</div>
+        <div class="stat-value gold" id="statArea">—</div>
+      </div>
+
+      <div class="ratio-bar-wrap">
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-bottom:4px">
+          <span>Aₙ/A₀ ratio</span>
+          <span id="ratioLabel">—</span>
+        </div>
+        <div class="ratio-bar-track">
+          <div class="ratio-bar-fill" id="ratioBar" style="width:0%"></div>
+        </div>
+        <div class="ratio-labels"><span>1.0×</span><span>1.2×</span><span>1.4×</span><span>1.6×</span></div>
+      </div>
+
+      <div class="converge-row">
+        <div class="converge-arrow">⟶</div>
+        <div class="converge-text">
+          Converges to <strong>A∞ = 8/5 · A₀ = 1.6×</strong><br>
+          = 2s²√3 / 5
+        </div>
+      </div>
+    </div>
+
+    <!-- Formula reference -->
+    <div class="card">
+      <div class="card-title">Formula reference</div>
+      <div class="formula-block">
+        <span>Sides:</span>   <span class="eq">Nₙ = 3·4ⁿ</span><br>
+        <span>Length:</span>  <span class="eq">Lₙ = s·(1/3)ⁿ</span><br>
+        <span>Perim:</span>   <span class="eq">Pₙ = 3s·(4/3)ⁿ → ∞</span><br>
+        <span>Area:</span>    <span class="eq">A∞ = 8/5·A₀</span><br>
+        <span>Dim:</span>     <span class="eq">D = ln4/ln3 ≈ 1.2618</span>
+      </div>
+    </div>
+
+    <!-- Color -->
+    <div class="card">
+      <div class="card-title">Appearance</div>
+      <div class="color-row">
+        <span class="color-label">Snowflake color</span>
+        <input type="color" id="colPicker" value="#00e5ff">
+      </div>
+      <div class="color-row" style="margin-top:10px">
+        <span class="color-label">Background</span>
+      </div>
+      <div class="bg-row" id="bgBtns">
+        <div class="bg-btn active" data-bg="#03080f" style="background:#03080f;border-color:var(--cyan)"></div>
+        <div class="bg-btn" data-bg="#000000" style="background:#000"></div>
+        <div class="bg-btn" data-bg="#0a0a2e" style="background:#0a0a2e"></div>
+        <div class="bg-btn" data-bg="#f0f4f8" style="background:#f0f4f8"></div>
+        <div class="bg-btn" data-bg="#0d1f0d" style="background:#0d1f0d"></div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- CANVAS -->
+  <main id="mainArea">
+    <canvas id="c"></canvas>
+    <button class="zoom-reset" id="resetBtn">Reset view</button>
+    <div class="zoom-hint">Scroll · Pinch to zoom &nbsp;|&nbsp; Drag to pan</div>
+  </main>
+
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const SQRT3 = Math.sqrt(3);
+const SIN60 = SQRT3 / 2;   // 0.86602...
+const COS60 = 0.5;
+
+// ── DOM refs ───────────────────────────────────────────────────────────────
+const canvas     = document.getElementById('c');
+const ctx        = canvas.getContext('2d');
+const slider     = document.getElementById('iterSlider');
+const iterNumEl  = document.getElementById('iterNum');
+const colPicker  = document.getElementById('colPicker');
+const mainArea   = document.getElementById('mainArea');
+const resetBtn   = document.getElementById('resetBtn');
+
+// stats
+const elSides    = document.getElementById('statSides');
+const elSideLen  = document.getElementById('statSideLen');
+const elPerim    = document.getElementById('statPerim');
+const elArea     = document.getElementById('statArea');
+const elRatioBar = document.getElementById('ratioBar');
+const elRatioLbl = document.getElementById('ratioLabel');
+
+// ── Camera ─────────────────────────────────────────────────────────────────
+let cam = { x: 0, y: 0, zoom: 1, drag: false, lx: 0, ly: 0 };
+
+function resetCam() {
+  cam.x = 0; cam.y = 0; cam.zoom = 1;
+  render();
+}
+resetBtn.addEventListener('click', resetCam);
+
+// ── Cached path (unit circle, radius=1) ───────────────────────────────────
+let cachedDepth = -1;
+let cachedPath  = null;   // Float64Array
+
+function buildKoch(depth) {
+  // Start: equilateral triangle vertices on unit circle (pointing up)
+  const R = 1;
+  const verts = [];
+  for (let i = 0; i < 3; i++) {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / 3;
+    verts.push([Math.cos(a) * R, Math.sin(a) * R]);
+  }
+
+  // Each segment stored as [p1, p2] (shared references)
+  let segs = [
+    [verts[0], verts[1]],
+    [verts[1], verts[2]],
+    [verts[2], verts[0]]
+  ];
+
+  for (let d = 0; d < depth; d++) {
+    const next = [];
+    for (const [[x1,y1],[x2,y2]] of segs) {
+      const dx = x2 - x1, dy = y2 - y1;
+      const ax = x1 + dx/3,       ay = y1 + dy/3;
+      const bx = x1 + dx*2/3,     by = y1 + dy*2/3;
+      const ex = dx/3, ey = dy/3;
+      // Rotate (ex,ey) by -60° → outward peak
+      const mx = ax + ex*COS60 + ey*SIN60;
+      const my = ay + ey*COS60 - ex*SIN60;
+      const A=[ax,ay], M=[mx,my], B=[bx,by];
+      next.push([[x1,y1],A],[A,M],[M,B],[B,[x2,y2]]);
+    }
+    segs = next;
+  }
+
+  // Flatten to Float64Array
+  const n = segs.length;
+  const arr = new Float64Array((n + 1) * 2);
+  arr[0] = segs[0][0][0]; arr[1] = segs[0][0][1];
+  for (let i = 0; i < n; i++) {
+    arr[i*2+2] = segs[i][1][0];
+    arr[i*2+3] = segs[i][1][1];
+  }
+  return arr;
+}
+
+function getPath(depth) {
+  if (cachedDepth !== depth) {
+    cachedPath  = buildKoch(depth);
+    cachedDepth = depth;
+  }
+  return cachedPath;
+}
+
+// ── Math stats ─────────────────────────────────────────────────────────────
+// s = side of initial triangle. For a unit-circle R=1 triangle: s = √3·R
+// A₀ = (√3/4)·s² = (√3/4)·3 = 3√3/4 (for R=1)
+function updateStats(n) {
+  const s = SQRT3; // side length of initial triangle when R=1
+
+  const Nn   = 3 * Math.pow(4, n);
+  const Ln   = s * Math.pow(1/3, n);
+  const Pn   = 3 * s * Math.pow(4/3, n);
+  const A0   = (SQRT3 / 4) * s * s;       // = 3√3/4
+  const ratio = 1 + (3/5) * (1 - Math.pow(4/9, n));
+  const An   = A0 * ratio;
+  const Ainf = A0 * 8/5;
+
+  iterNumEl.textContent = n;
+  elSides.textContent   = Nn.toLocaleString();
+  elSideLen.textContent = Ln.toFixed(6) + ' u';
+  elPerim.textContent   = Pn.toFixed(4) + ' u' + (n >= 5 ? ' →∞' : '');
+  elArea.textContent    = An.toFixed(6) + ' u²';
+
+  const pct = Math.min(100, ((ratio - 1.0) / (1.6 - 1.0)) * 100);
+  elRatioBar.style.width = pct + '%';
+  elRatioLbl.textContent = ratio.toFixed(5) + '×';
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+let bgColor = '#03080f';
+
+function render() {
+  const dpr = window.devicePixelRatio || 1;
+  const W = mainArea.clientWidth, H = mainArea.clientHeight;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, W, H);
+
+  const depth  = parseInt(slider.value);
+  const color  = colPicker.value;
+  const radius = Math.min(W, H) * 0.40;
+  const path   = getPath(depth);
+
+  ctx.save();
+  ctx.translate(W/2 + cam.x, H/2 + cam.y);
+  ctx.scale(radius * cam.zoom, radius * cam.zoom);
+
+  ctx.beginPath();
+  ctx.moveTo(path[0], path[1]);
+  for (let i = 2; i < path.length; i += 2) {
+    ctx.lineTo(path[i], path[i+1]);
+  }
+  ctx.closePath();
+  ctx.fillStyle   = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 0.0015;
+  ctx.lineJoin    = 'round';
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  updateStats(depth);
+}
+
+// ── Controls ───────────────────────────────────────────────────────────────
+slider.addEventListener('input',  () => iterNumEl.textContent = slider.value);
+slider.addEventListener('change', render);
+colPicker.addEventListener('input', render);
+
+document.getElementById('bgBtns').addEventListener('click', e => {
+  const btn = e.target.closest('.bg-btn');
+  if (!btn) return;
+  bgColor = btn.dataset.bg;
+  document.querySelectorAll('.bg-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+});
+
+// ── Zoom (wheel) ───────────────────────────────────────────────────────────
+mainArea.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = Math.pow(1.12, -e.deltaY / 80);
+  const mx = e.clientX - mainArea.getBoundingClientRect().left - mainArea.clientWidth/2;
+  const my = e.clientY - mainArea.getBoundingClientRect().top  - mainArea.clientHeight/2;
+  cam.x = mx + (cam.x - mx) * factor;
+  cam.y = my + (cam.y - my) * factor;
+  cam.zoom *= factor;
+  render();
+}, { passive: false });
+
+// ── Pan (mouse) ────────────────────────────────────────────────────────────
+mainArea.addEventListener('mousedown', e => {
+  cam.drag = true; cam.lx = e.clientX; cam.ly = e.clientY;
+  canvas.classList.add('grabbing');
+});
+window.addEventListener('mousemove', e => {
+  if (!cam.drag) return;
+  cam.x += e.clientX - cam.lx; cam.y += e.clientY - cam.ly;
+  cam.lx = e.clientX; cam.ly = e.clientY;
+  render();
+});
+window.addEventListener('mouseup', () => { cam.drag = false; canvas.classList.remove('grabbing'); });
+
+// ── Pan + Pinch (touch) ───────────────────────────────────────────────────
+let lt = null;
+mainArea.addEventListener('touchstart',  e => { lt = e.touches; }, { passive: true });
+mainArea.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && lt?.length === 1) {
+    cam.x += e.touches[0].clientX - lt[0].clientX;
+    cam.y += e.touches[0].clientY - lt[0].clientY;
+    render();
+  } else if (e.touches.length === 2 && lt?.length === 2) {
+    const d1 = Math.hypot(lt[0].clientX-lt[1].clientX, lt[0].clientY-lt[1].clientY);
+    const d2 = Math.hypot(e.touches[0].clientX-e.touches[1].clientX,
+                          e.touches[0].clientY-e.touches[1].clientY);
+    const f  = d2 / d1;
+    const rect = mainArea.getBoundingClientRect();
+    const mx = (e.touches[0].clientX+e.touches[1].clientX)/2 - rect.left - mainArea.clientWidth/2;
+    const my = (e.touches[0].clientY+e.touches[1].clientY)/2 - rect.top  - mainArea.clientHeight/2;
+    cam.x = mx + (cam.x - mx) * f;
+    cam.y = my + (cam.y - my) * f;
+    cam.zoom *= f;
+    render();
+  }
+  lt = e.touches;
+}, { passive: false });
+
+window.addEventListener('resize', render);
+render();
+</script>
+</body>
+</html>
